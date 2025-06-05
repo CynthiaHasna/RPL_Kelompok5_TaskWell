@@ -1,0 +1,330 @@
+<?php 
+session_start();
+include "../../service/koneksi.php";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $nama_tugas = $_POST['nama_tugas'] ?? '';
+    $deskripsi = $_POST['deskripsi'] ?? '';
+    $deadline = $_POST['deadline'] ?? '';
+    $level = $_POST['level'] ?? '';
+    $id_kelas = $_POST['id_kelas'] ?? 0;
+    $id_user = $_SESSION['id_user'];
+    $created_at = date("Y-m-d H:i:s");
+
+    $file_tugas = '';
+    if (isset($_FILES['file_tugas']['name']) && $_FILES['file_tugas']['error'] === 0) {
+        $file_tugas = basename($_FILES['file_tugas']['name']);
+        $target_path = "../../uploads/" . $file_tugas;
+        move_uploaded_file($_FILES['file_tugas']['tmp_name'], $target_path);
+    }
+
+    if (empty($nama_tugas) || empty($deadline) || empty($level) || empty($id_kelas)) {
+        die("Ada data kosong bro, cek lagi.");
+    }
+
+    $query = "INSERT INTO tugas (nama_tugas, deskripsi, file_tugas, deadline, level, id_user, created_at, id_kelas) 
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $koneksi->prepare($query);
+    $stmt->bind_param("sssssisi", $nama_tugas, $deskripsi, $file_tugas, $deadline, $level, $id_user, $created_at, $id_kelas);
+
+    if ($stmt->execute()) {
+        echo "<script>
+            alert('Tugas berhasil dikirim!');
+            if (window.opener) {
+                window.opener.location.reload();
+                window.close();
+            } else {
+                window.location.href = 'forum.php?id_kelas=$id_kelas';
+            }
+        </script>";
+        exit;
+    } else {
+        echo "Gagal insert tugas: " . $stmt->error;
+    }
+}
+?>
+
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Well - Pengumpulan Tugas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+    }
+    html, body {
+      overflow: hidden;
+    }
+    body {
+      background-size: cover;
+      position: relative;
+      height: 100vh;
+      transition: opacity 0.5s ease;
+    }
+    
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 60px auto;
+      background-color: #e5d2b7;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .header {
+      background-color: #a37555;
+      color: white;
+      text-align: center;
+      padding: 24px;
+      font-weight: 600;
+      font-size: 16px;
+      position: relative;
+    }
+
+    .form-content {
+      display: flex;
+      padding: 30px;
+      gap: 20px;
+    }
+
+    .left-section {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    textarea,
+    input[type="file"],
+    input[type="datetime-local"] {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1.5px solid #555;
+      font-size: 14px;
+    }
+
+    textarea::placeholder,
+    input::placeholder {
+      color: #aaa;
+      font-style: italic;
+    }
+
+    .file-input-wrapper {
+      position: relative;
+    }
+
+    .file-input-wrapper::before {
+      content: "\1F4C4";
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .file-input-wrapper input[type="file"] {
+      padding-left: 30px;
+    }
+
+    .bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .datetime-input {
+      width: 60%;
+    }
+
+    .button-submit {
+      background-color: #80573c;
+      color: white;
+      padding: 10px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .button-submit:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+
+    .right-section {
+      flex: 1;
+      background-color: #f8f5f2;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+
+    .right-section h3 {
+      background-color: #d8c8b5;
+      padding: 10px;
+      border-radius: 10px;
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    .level-button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      color: white;
+      font-style: italic;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+.level-button.active.red {
+  background-color: #e64848;
+  color: white;
+}
+
+.level-button.active.blue {
+  background-color: #61b3e3;
+  color: white;
+}
+
+.level-button.active.green {
+  background-color: #4cd964;
+  color: white;
+}
+
+  .level-button:not(.active) {
+    background-color: #d3cfcf !important; /* abu-abu */
+    color: #555 !important;
+  }
+
+    .level-button.red { background-color: #e64848; }
+    .level-button.blue { background-color: #61b3e3; }
+    .level-button.green { background-color: #4cd964; }
+
+    .level-button.active {
+      box-shadow: 0 0 0 3px #44444455;
+      transform: scale(1.02);
+    }
+
+    .hidden {
+      display: none;
+}
+
+    @media screen and (max-width: 768px) {
+      .form-content {
+        flex-direction: column;
+      }
+
+      .bottom-row {
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .datetime-input, .button-submit {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body style="cursor: url('./../gambar/rumus.png') 0 0, auto;">
+
+  <div class="blur-layer"></div>
+
+  <div class="container" id="task-container">
+    <div class="header">
+      Siswa siap mengerjakan tantangan dari Anda.<br>
+      Jangan lupa berikan instruksi yang jelas dan deskripsi tugas yang lengkap ya, Guru Hebat!
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" action="">
+    <div class="form-content">
+        <div class="left-section">
+           <input type="hidden" name="id_kelas" value="<?php echo htmlspecialchars($id_kelas); ?>">
+           <label for="task-name" style="font-weight:bold; margin-bottom: 6px; display: block;">Nama Tugas:</label>
+          <textarea id="task-name" name="nama_tugas" rows="3" placeholder="Masukkan nama tugas..." required></textarea>
+
+          <label for="task-desc" style="font-weight:bold; margin-bottom: 6px; display: block;">Deskripsi Tugas:</label>
+          <textarea id="task-desc" name="deskripsi" rows="3" placeholder="Masukkan deskripsi tugas..." required></textarea>
+
+          <label for="task-file" style="font-weight:bold; margin-top: 10px; margin-bottom: 6px; display: block;">File Tugas:</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="task-file" name="file_tugas" accept=".pdf" required />
+          </div>
+
+          <div class="bottom-row" style="margin-top: 20px;">
+            <label for="task-deadline" style="font-weight:bold;">Deadline:</label>
+            <input type="datetime-local" class="datetime-input" id="task-deadline" name="deadline" required />
+          </div>
+        </div>
+
+        <div class="right-section">
+          <h3>Level Tugas</h3>
+          <button type="button" class="level-button red" data-level="hard">Sulit</button>
+          <button type="button" class="level-button blue" data-level="medium">Sedang</button>
+          <button type="button" class="level-button green" data-level="easy">Mudah</button>
+        </div>
+      </div>
+
+      <input type="hidden" name="level" id="task-level">
+
+<button class="button-submit" id="submit-btn" type="submit" name="forum" disabled>Kirim</button>
+    </form>
+  </div>
+
+  <script>
+    const levelButtons = document.querySelectorAll('.level-button');
+    const descInput = document.getElementById('task-desc');
+    const fileInput = document.getElementById('task-file');
+    const deadlineInput = document.getElementById('task-deadline');
+    const submitBtn = document.getElementById('submit-btn');
+    const taskLevelInput = document.getElementById('task-level');
+
+    let selectedLevel = null;
+
+    function validateForm() {
+      const isDescFilled = descInput.value.trim() !== '';
+      const isFileSelected = fileInput.files.length > 0;
+      const isDeadlineSet = deadlineInput.value !== '';
+      const isLevelChosen = selectedLevel !== null;
+
+      if (isDescFilled && isFileSelected && isDeadlineSet && isLevelChosen) {
+        submitBtn.disabled = false;
+      } else {
+        submitBtn.disabled = true;
+      }
+    }
+
+    descInput.addEventListener('input', validateForm);
+    fileInput.addEventListener('change', validateForm);
+    deadlineInput.addEventListener('input', validateForm);
+
+    levelButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        levelButtons.forEach(btn => btn.classList.remove('active'));
+        button.classList.add('active');
+        selectedLevel = button.getAttribute('data-level');
+        taskLevelInput.value = selectedLevel;
+        validateForm();
+      });
+    });
+  </script>
+</body>
+</html>
+
